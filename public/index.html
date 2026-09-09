@@ -103,13 +103,14 @@ function render(){
   // cards
   const cards=[ ['fu','燃料油主力'],['sc','原油主力'],['lu','低硫燃料油'],['brent','布伦特'],['wti','WTI'] ];
   $('cards').innerHTML=cards.map(([k,l])=>{ const x=q[k]; if(!x)return''; let ses=''; if(x.overnightPct!=null && k==='fu') ses='<div class="lbl">夜盘开盘 '+pct(x.overnightPct)+' · 日内 '+pct(x.intradayPct)+'</div>'; return '<div class="card"><div class="lbl">'+l+'</div><div class="val">'+fmt(x.latest)+'</div><div class="chg '+chg(x.changePct)+'">'+pct(x.changePct)+'</div><div class="lbl">量 '+fmt(x.vol)+' · 仓 '+fmt(x.hold)+'</div>'+ses+'</div>'; }).join('');
-  try{ renderCharts(); renderTerm(); renderTech(); renderSpreads(); renderDip(); renderHz(); renderNews(); }catch(e){ console.error('render err',e); if($('nadv')) $('nadv').innerHTML='<div class="lbl">部分渲染异常：'+esc(e.message)+'</div>'; }
+  // 逐块渲染，单块失败不影响其余
+  [renderCharts, renderTerm, renderTech, renderSpreads, renderDip, renderHz, renderNews].forEach(fn=>{ try{ fn(); }catch(e){ console.error('section err', e); } });
   renderNarr();
 }
 function mkChart(id,labels,vals,opt={}){ const el=$(id); if(!el||!window.Chart)return; if(charts[id])charts[id].destroy(); charts[id]=new Chart(el,{type:opt.type||'line',data:{labels,datasets:opt.datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:opt.legend!==false,labels:{color:'#93a1b3',font:{size:10}}}},scales:{x:{ticks:{color:'#93a1b3',maxTicksLimit:8,font:{size:9}}},y:{ticks:{color:'#93a1b3',font:{size:9}}}}}}); }
 function renderCharts(){
   const c=REPORT.charts||{};
-  const line=(data,color,label)=>{ const ds={data:data.map(x=>x.close),borderColor:color,backgroundColor:color+'22',fill:true,tension:.25,pointRadius:0,borderWidth:1.5,label}; const labels=data.map(x=>x.date.slice(5)); return {labels,ds}; };
+  const line=(data,color,label)=>{ const ds={data:data.map(x=>x.close),borderColor:color,backgroundColor:color+'22',fill:true,tension:.25,pointRadius:0,borderWidth:1.5,label}; const labels=data.map(x=>x.date? x.date.slice(5) : (x.time? String(x.time).slice(11,16) : '')); return {labels,ds}; };
   if(c.fu?.length){ const {labels,ds}=line(c.fu,'#3b82f6','FU收盘'); mkChart('cFu',labels,[ds]); }
   if(c.intraday?.length){ const {labels,ds}=line(c.intraday,'#22c55e','价格'); mkChart('cIntra',labels,[ds]); }
   if(c.spreads?.length){ const labels=c.spreads.map(x=>x.date.slice(5)); const ds={data:c.spreads.map(x=>x.crackFU),borderColor:'#f97316',backgroundColor:'#f9731622',fill:true,tension:.2,pointRadius:0,label:'crackFU'}; mkChart('cCrack',labels,[ds]); }
