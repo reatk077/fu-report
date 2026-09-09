@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/data.js": { "maxDuration": 60 },
+    "api/refresh.js": { "maxDuration": 60 },
+    "api/health.js": { "maxDuration": 30 }
+  },
+  "crons": [
+    { "path": "/api/refresh", "schedule": "45 0 * * *" }
+  ],
+  "headers": [
+    { "source": "/api/(.*)", "headers": [ { "key": "Cache-Control", "value": "no-store" } ] }
+  ]
+}
