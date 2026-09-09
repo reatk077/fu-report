@@ -1,0 +1,13 @@
+{
+  "name": "fu-report",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "每日燃油期货信息汇总分析（Vercel 部署）",
+  "scripts": {
+    "daily": "node --env-file=.env cli/run-daily.mjs",
+    "daily:html": "node --env-file=.env cli/run-daily.mjs --html"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {}
+}
