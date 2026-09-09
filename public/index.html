@@ -72,7 +72,7 @@ label{font-size:12px;color:var(--sub);display:flex;flex-direction:column;gap:3px
   <h2>我的持仓（纳入 AI 解读与操作建议）</h2>
   <form class="posform" onsubmit="savePos(event)">
     <label>方向<select id="p_dir"><option value="long">多</option><option value="short">空</option></select></label>
-    <label>购入价<label><input id="p_entry" type="number" step="1" placeholder="如 3900"></label></label>
+    <label>购入价<input id="p_entry" type="number" step="1" placeholder="如 3900"></label>
     <label>手数<input id="p_qty" type="number" step="1" value="1"></label>
     <label>购入日期<input id="p_date" type="date"></label>
     <button class="btn" type="submit">保存</button>
@@ -103,9 +103,10 @@ function render(){
   // cards
   const cards=[ ['fu','燃料油主力'],['sc','原油主力'],['lu','低硫燃料油'],['brent','布伦特'],['wti','WTI'] ];
   $('cards').innerHTML=cards.map(([k,l])=>{ const x=q[k]; if(!x)return''; let ses=''; if(x.overnightPct!=null && k==='fu') ses='<div class="lbl">夜盘开盘 '+pct(x.overnightPct)+' · 日内 '+pct(x.intradayPct)+'</div>'; return '<div class="card"><div class="lbl">'+l+'</div><div class="val">'+fmt(x.latest)+'</div><div class="chg '+chg(x.changePct)+'">'+pct(x.changePct)+'</div><div class="lbl">量 '+fmt(x.vol)+' · 仓 '+fmt(x.hold)+'</div>'+ses+'</div>'; }).join('');
-  renderCharts(); renderTerm(); renderTech(); renderSpreads(); renderDip(); renderHz(); renderNews(); renderNarr();
+  try{ renderCharts(); renderTerm(); renderTech(); renderSpreads(); renderDip(); renderHz(); renderNews(); }catch(e){ console.error('render err',e); if($('nadv')) $('nadv').innerHTML='<div class="lbl">部分渲染异常：'+esc(e.message)+'</div>'; }
+  renderNarr();
 }
-function mkChart(id,labels,vals,opt){ const el=$(id); if(!el||!window.Chart)return; if(charts[id])charts[id].destroy(); charts[id]=new Chart(el,{type:opt.type||'line',data:{labels,datasets:opt.datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:opt.legend!==false,labels:{color:'#93a1b3',font:{size:10}}}},scales:{x:{ticks:{color:'#93a1b3',maxTicksLimit:8,font:{size:9}}},y:{ticks:{color:'#93a1b3',font:{size:9}}}}}}); }
+function mkChart(id,labels,vals,opt={}){ const el=$(id); if(!el||!window.Chart)return; if(charts[id])charts[id].destroy(); charts[id]=new Chart(el,{type:opt.type||'line',data:{labels,datasets:opt.datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:opt.legend!==false,labels:{color:'#93a1b3',font:{size:10}}}},scales:{x:{ticks:{color:'#93a1b3',maxTicksLimit:8,font:{size:9}}},y:{ticks:{color:'#93a1b3',font:{size:9}}}}}}); }
 function renderCharts(){
   const c=REPORT.charts||{};
   const line=(data,color,label)=>{ const ds={data:data.map(x=>x.close),borderColor:color,backgroundColor:color+'22',fill:true,tension:.25,pointRadius:0,borderWidth:1.5,label}; const labels=data.map(x=>x.date.slice(5)); return {labels,ds}; };
@@ -156,7 +157,7 @@ function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 // position
 function openPos(){ const p=JSON.parse(localStorage.getItem('fu_position')||'null'); if(p){$('p_dir').value=p.direction||'long';$('p_entry').value=p.entry;$('p_qty').value=p.qty||1;$('p_date').value=p.date||'';} $('posModal').classList.remove('hide'); }
 function closePos(){ $('posModal').classList.add('hide'); }
-function savePos(e){ e.preventDefault(); const p={direction:$('p_dir').value,entry:+$('p_entry').value,qty:+$('p_qty').value||1,date:$('p_date').value}; if(!p.entry){alert('请输入购入价');return;} localStorage.setItem('fu_position',JSON.stringify(p)); closePos(); load(); }
+function savePos(e){ e.preventDefault(); try{ const entry=parseFloat($('p_entry').value); if(!entry||isNaN(entry)){ alert('请输入有效的购入价'); return; } const p={direction:$('p_dir').value, entry:entry, qty:parseInt($('p_qty').value)||1, date:$('p_date').value}; localStorage.setItem('fu_position',JSON.stringify(p)); closePos(); load(); }catch(err){ alert('保存失败：'+err.message); } }
 load();
 </script>
 </body></html>
