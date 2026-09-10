@@ -1,0 +1,19 @@
+name: daily-fu-refresh
+on:
+  schedule:
+    # 北京时间 08:45 / 12:45 / 20:45  (UTC+8 → UTC 00:45 / 04:45 / 12:45)
+    - cron: '45 0 * * *'
+    - cron: '45 4 * * *'
+    - cron: '45 12 * * *'
+  workflow_dispatch: {}
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger FU_Report data refresh
+        run: |
+          code=$(curl -sS -o /tmp/fu_refresh.json -w "%{http_code}" "https://fu-report.vercel.app/api/refresh")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then cat /tmp/fu_refresh.json; exit 1; fi
+          grep -o '"ok":[a-z]*' /tmp/fu_refresh.json | head -1
