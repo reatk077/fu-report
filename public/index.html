@@ -38,6 +38,8 @@ td.l,th.l{text-align:left}
 .src{font-size:11px;color:var(--sub)}
 footer{margin-top:18px;color:var(--sub);font-size:12px;border-top:1px solid var(--line);padding-top:10px}
 .center{text-align:center}.hide{display:none}
+#posModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60}
+#posModal.hide{display:none}
 input,select{background:#0d131a;color:var(--txt);border:1px solid var(--line);padding:6px 8px;border-radius:6px}
 .posform{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
 label{font-size:12px;color:var(--sub);display:flex;flex-direction:column;gap:3px}
@@ -67,7 +69,7 @@ label{font-size:12px;color:var(--sub);display:flex;flex-direction:column;gap:3px
 <footer id="foot"></footer>
 </div>
 
-<div id="posModal" class="hide" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center">
+<div id="posModal" class="hide">
  <div class="sec" style="width:min(440px,92vw)">
   <h2>我的持仓（纳入 AI 解读与操作建议）</h2>
   <form class="posform" onsubmit="savePos(event)">
