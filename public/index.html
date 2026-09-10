@@ -116,7 +116,7 @@ label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3
   </div>
   <div class="hrow">
     <button class="btn ghost" onclick="openPos()">我的持仓</button>
-    <button class="btn" onclick="load()">刷新</button>
+    <button class="btn" onclick="load(true)">刷新</button>
   </div>
 </header>
 <div class="ticker" id="ticker"><span class="lbl">加载中…</span></div>
@@ -156,17 +156,30 @@ const $=id=>document.getElementById(id);
 const fmt=v=>v==null||isNaN(v)?'—':(+v).toLocaleString('zh-CN');
 const pct=v=>v==null||isNaN(v)?'—':(v>=0?'+':'')+(+v).toFixed(2)+'%';
 const chg=v=>v==null||isNaN(v)?'':(v>=0?'up':'down');
-let REPORT=null, charts={};
+let REPORT=null, charts={}, FROM_CACHE=false;
+const SLOTS=[45,285,765]; // UTC 分钟: 00:45/04:45/12:45 = 北京 08:45/12:45/20:45
+function lastSlotUTC(){ const d=new Date(); const ds=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()); let last=null; for(const m of SLOTS){ const t=ds+m*60000; if(t<=Date.now()) last=t; } if(last==null) last=ds-86400000+SLOTS[SLOTS.length-1]*60000; return last; }
 function posQuery(){ const arr=JSON.parse(localStorage.getItem('fu_positions')||'[]'); if(!Array.isArray(arr))return''; const clean=arr.filter(p=>p&&+p.entry).map(p=>({direction:p.direction||'long',entry:+p.entry,qty:+p.qty||1,date:p.date||''})); if(!clean.length)return''; return '&positions='+encodeURIComponent(JSON.stringify(clean)); }
-async function load(){
-  $('meta').textContent='加载中…'; try{
-    const r=await fetch('/api/data?__='+Date.now()+posQuery()); const d=await r.json(); REPORT=d; render();
-  }catch(e){ $('meta').textContent='加载失败：'+e.message; }
+function cacheRead(){ try{ return JSON.parse(localStorage.getItem('fu_report_cache')||'null'); }catch(e){ return null; } }
+function cacheWrite(key,report){ try{ localStorage.setItem('fu_report_cache', JSON.stringify({ts:Date.now(),key,report})); }catch(e){} }
+async function load(force){
+  const key=posQuery(), c=cacheRead();
+  if(!force && c && c.key===key && c.report && c.ts>=lastSlotUTC()){ REPORT=c.report; FROM_CACHE=true; render(); return; }
+  $('meta').textContent='加载中…'; FROM_CACHE=false;
+  try{
+    const r=await fetch('/api/data?__='+Date.now()+(force?'&refresh=1':'')+key); const d=await r.json();
+    if(!d || d.error) throw new Error((d&&d.error)||'bad response');
+    REPORT=d; cacheWrite(key,d); render();
+  }catch(e){
+    const cc=cacheRead();
+    if(cc && cc.report){ REPORT=cc.report; FROM_CACHE=true; render(); $('meta').textContent='服务/网络异常 · 显示上次缓存数据（数据时间 '+(REPORT.meta&&REPORT.meta.generatedAt||'')+'）'; }
+    else $('meta').textContent='加载失败：'+e.message;
+  }
 }
 function renderTickerF(){ const q=REPORT&&REPORT.quotes; const tk=$('ticker'); if(!q||!tk) return; const items=[['FU燃料油','fu'],['SC原油','sc'],['LU低硫','lu'],['布伦特','brent'],['WTI','wti']].filter(([,k])=>q[k]).map(([n,k])=>{ const x=q[k]; return '<span class="tk"><b>'+n+'</b> '+fmt(x.latest)+' <em class="'+chg(x.changePct)+'">'+pct(x.changePct)+'</em></span>'; }); if(items.length) tk.innerHTML=items.join(''); }
 function render(){
   const q=REPORT.quotes||{}, m=REPORT.meta||{};
-  $('meta').textContent=m.generatedAt+' · 北京时间 · 数据截止 '+m.dataCutoff+' · '+m.marketStatus+' · 耗时'+m.timeCostMs+'ms';
+  $('meta').textContent=m.generatedAt+' · 北京时间 · 数据截止 '+m.dataCutoff+' · '+m.marketStatus+' · 耗时'+m.timeCostMs+'ms'+(FROM_CACHE?' · 本地缓存(未消耗AI)':'');
   // risk
   const rk=REPORT.risk?.hormuz?.level||{label:'绿色 · 平静',color:'#12855b'};
   $('risk').style.background=rk.color+'1a'; $('risk').style.border='1px solid '+rk.color;
@@ -179,7 +192,7 @@ function render(){
   [renderCharts, renderTerm, renderTech, renderSpreads, renderDip, renderHz, renderNews].forEach(fn=>{ try{ fn(); }catch(e){ console.error('section err', e); } });
   renderNarr();
 }
-function mkChart(id,labels,vals,opt={}){ const el=$(id); if(!el||!window.Chart)return; if(charts[id])charts[id].destroy(); charts[id]=new Chart(el,{type:opt.type||'line',data:{labels,datasets:opt.datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:opt.legend!==false,labels:{color:'#8f887c',font:{size:10}}}},scales:{x:{ticks:{color:'#8f887c',maxTicksLimit:8,font:{size:9}}},y:{ticks:{color:'#8f887c',font:{size:9}}}}}}); }
+function mkChart(id,labels,vals,opt={}){ const el=$(id); if(!el||!window.Chart)return; if(charts[id])charts[id].destroy(); charts[id]=new Chart(el,{type:opt.type||'line',data:{labels,datasets:vals},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:opt.legend!==false,labels:{color:'#8f887c',font:{size:10}}}},scales:{x:{ticks:{color:'#8f887c',maxTicksLimit:8,font:{size:9}}},y:{ticks:{color:'#8f887c',font:{size:9}}}}}}); }
 function renderCharts(){
   const c=REPORT.charts||{};
   const line=(data,color,label)=>{ const ds={data:data.map(x=>x.close),borderColor:color,backgroundColor:color+'22',fill:true,tension:.25,pointRadius:0,borderWidth:1.5,label}; const labels=data.map(x=>x.date? x.date.slice(5) : (x.time? String(x.time).slice(11,16) : '')); return {labels,ds}; };
@@ -220,7 +233,7 @@ function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 function openPos(){ const arr=JSON.parse(localStorage.getItem('fu_positions')||'[]'); $('posRows').innerHTML=''; const list=(Array.isArray(arr)&&arr.length)?arr:[null]; list.forEach(p=>addPosRow(p)); $('posModal').classList.remove('hide'); }
 function addPosRow(p){ const r=document.createElement('div'); r.className='posrow'; r.innerHTML='<select class="pd_dir"><option value="long">多</option><option value="short">空</option></select><input class="pd_entry" type="number" step="1" placeholder="购入价" value="'+(p&&p.entry||'')+'"><input class="pd_qty" type="number" step="1" value="'+(p&&p.qty||1)+'"><input class="pd_date" type="date" value="'+(p&&p.date||'')+'"><button class="btn gray" type="button" onclick="this.parentNode.remove()">移除</button>'; if(p&&p.direction==='short') r.querySelector('.pd_dir').value='short'; $('posRows').appendChild(r); }
 function closePos(){ $('posModal').classList.add('hide'); }
-function savePos(){ try{ const rows=[...document.querySelectorAll('#posRows .posrow')]; const arr=rows.map(row=>({direction:row.querySelector('.pd_dir').value, entry:+row.querySelector('.pd_entry').value, qty:parseInt(row.querySelector('.pd_qty').value)||1, date:row.querySelector('.pd_date').value})).filter(p=>+p.entry); if(!arr.length){ alert('请至少填写一笔记购入价'); return; } localStorage.setItem('fu_positions',JSON.stringify(arr)); closePos(); load(); }catch(err){ alert('保存失败：'+err.message); } }
+function savePos(){ try{ const rows=[...document.querySelectorAll('#posRows .posrow')]; const arr=rows.map(row=>({direction:row.querySelector('.pd_dir').value, entry:+row.querySelector('.pd_entry').value, qty:parseInt(row.querySelector('.pd_qty').value)||1, date:row.querySelector('.pd_date').value})).filter(p=>+p.entry); if(!arr.length){ alert('请至少填写一笔记购入价'); return; } localStorage.setItem('fu_positions',JSON.stringify(arr)); closePos(); load(true); }catch(err){ alert('保存失败：'+err.message); } }
 load();
 </script>
 </body></html>
